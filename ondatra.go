@@ -130,9 +130,9 @@ func (b Builder) RunInTransaction(ctx context.Context, exec func(Builder) error)
 	return tx.Commit()
 }
 
-func (b Builder) Clauses(clauses []Clause) Builder {
+func (b Builder) Clauses(clauses ...Clause) Builder {
 	for i := range clauses {
-		clauses[i].Apply(&b)
+		b = clauses[i].Apply(b)
 	}
 	return b
 }

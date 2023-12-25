@@ -1,7 +1,7 @@
 package ondatra
 
 type Clause interface {
-	Apply(b *Builder)
+	Apply(b Builder) Builder
 }
 
 type prefixClause struct {
@@ -9,8 +9,8 @@ type prefixClause struct {
 	args   []any
 }
 
-func (c prefixClause) Apply(b *Builder) {
-	b.Prefix(c.rawSQL, c.args...)
+func (c prefixClause) Apply(b Builder) Builder {
+	return b.Prefix(c.rawSQL, c.args...)
 }
 
 func Prefix(rawSQL string, args ...any) Clause {
@@ -24,8 +24,8 @@ type selectColumnsClause struct {
 	columns []string
 }
 
-func (c selectColumnsClause) Apply(b *Builder) {
-	b.SelectColumns(c.columns...)
+func (c selectColumnsClause) Apply(b Builder) Builder {
+	return b.SelectColumns(c.columns...)
 }
 
 func SelectColumns(columns ...string) Clause {
@@ -39,8 +39,8 @@ type selectColumnClause struct {
 	args   []any
 }
 
-func (c selectColumnClause) Apply(b *Builder) {
-	b.SelectColumn(c.rawSQL, c.args)
+func (c selectColumnClause) Apply(b Builder) Builder {
+	return b.SelectColumn(c.rawSQL, c.args...)
 }
 
 func SelectColumn(rawSQL string, args ...any) Clause {
@@ -54,8 +54,8 @@ type optionsClause struct {
 	options []string
 }
 
-func (c optionsClause) Apply(b *Builder) {
-	b.Options(c.options...)
+func (c optionsClause) Apply(b Builder) Builder {
+	return b.Options(c.options...)
 }
 
 func Options(options ...string) Clause {
@@ -66,8 +66,8 @@ func Options(options ...string) Clause {
 
 type distinctClause struct{}
 
-func (c distinctClause) Apply(b *Builder) {
-	b.Distinct()
+func (c distinctClause) Apply(b Builder) Builder {
+	return b.Distinct()
 }
 
 func Distinct() Clause {
@@ -78,8 +78,8 @@ type columnsClause struct {
 	columns []string
 }
 
-func (c columnsClause) Apply(b *Builder) {
-	b.Columns(c.columns...)
+func (c columnsClause) Apply(b Builder) Builder {
+	return b.Columns(c.columns...)
 }
 
 func Columns(columns ...string) Clause {
@@ -93,8 +93,8 @@ type setClause struct {
 	value  any
 }
 
-func (c setClause) Apply(b *Builder) {
-	b.Set(c.column, c.value)
+func (c setClause) Apply(b Builder) Builder {
+	return b.Set(c.column, c.value)
 }
 
 func Set(column string, value any) Clause {
@@ -108,8 +108,8 @@ type setExprClause struct {
 	expr []Expr
 }
 
-func (c setExprClause) Apply(b *Builder) {
-	b.SetExpr(c.expr...)
+func (c setExprClause) Apply(b Builder) Builder {
+	return b.SetExpr(c.expr...)
 }
 
 func SetExpr(expr ...Expr) Clause {
@@ -124,8 +124,8 @@ type joinClause struct {
 	args     []any
 }
 
-func (c joinClause) Apply(b *Builder) {
-	b.Join(c.joinType, c.join)
+func (c joinClause) Apply(b Builder) Builder {
+	return b.Join(c.joinType, c.join)
 }
 
 func Join(joinType, join string, args ...any) Clause {
@@ -136,12 +136,28 @@ func Join(joinType, join string, args ...any) Clause {
 	}
 }
 
+type joinRawClause struct {
+	rawSQL string
+	args   []any
+}
+
+func (c joinRawClause) Apply(b Builder) Builder {
+	return b.JoinRaw(c.rawSQL, c.args...)
+}
+
+func JoinRaw(rawSQL string, args ...any) Clause {
+	return joinRawClause{
+		rawSQL: rawSQL,
+		args:   args,
+	}
+}
+
 type joinExprClause struct {
 	expr []Expr
 }
 
-func (c joinExprClause) Apply(b *Builder) {
-	b.JoinExpr(c.expr...)
+func (c joinExprClause) Apply(b Builder) Builder {
+	return b.JoinExpr(c.expr...)
 }
 
 func JoinExpr(expr ...Expr) Clause {
@@ -155,8 +171,8 @@ type whereClause struct {
 	args   []any
 }
 
-func (c whereClause) Apply(b *Builder) {
-	b.Where(c.rawSQL, c.args)
+func (c whereClause) Apply(b Builder) Builder {
+	return b.Where(c.rawSQL, c.args...)
 }
 
 func Where(rawSQL string, args ...any) Clause {
@@ -170,8 +186,8 @@ type whereExprClause struct {
 	expr []Expr
 }
 
-func (c whereExprClause) Apply(b *Builder) {
-	b.WhereExpr(c.expr...)
+func (c whereExprClause) Apply(b Builder) Builder {
+	return b.WhereExpr(c.expr...)
 }
 
 func WhereExpr(expr ...Expr) Clause {
@@ -184,11 +200,11 @@ type groupByClause struct {
 	groupBys []string
 }
 
-func (c groupByClause) Apply(b *Builder) {
-	b.GroupBy(c.groupBys...)
+func (c groupByClause) Apply(b Builder) Builder {
+	return b.GroupBy(c.groupBys...)
 }
 
-func GroupBy(groupBys []string) Clause {
+func GroupBy(groupBys ...string) Clause {
 	return groupByClause{
 		groupBys: groupBys,
 	}
@@ -199,8 +215,8 @@ type havingClause struct {
 	args   []any
 }
 
-func (c havingClause) Apply(b *Builder) {
-	b.Having(c.rawSQL, c.args...)
+func (c havingClause) Apply(b Builder) Builder {
+	return b.Having(c.rawSQL, c.args...)
 }
 
 func Having(rawSQL string, args ...any) Clause {
@@ -214,13 +230,29 @@ type orderByClause struct {
 	orderBy []string
 }
 
-func (c orderByClause) Apply(b *Builder) {
-	b.OrderBy(c.orderBy...)
+func (c orderByClause) Apply(b Builder) Builder {
+	return b.OrderBy(c.orderBy...)
 }
 
-func OrderBy(orderBy []string) Clause {
+func OrderBy(orderBy ...string) Clause {
 	return orderByClause{
 		orderBy: orderBy,
+	}
+}
+
+type orderByArgsClause struct {
+	rawSQL string
+	args   []any
+}
+
+func (c orderByArgsClause) Apply(b Builder) Builder {
+	return b.OrderByArgs(c.rawSQL, c.args...)
+}
+
+func OrderByArgs(rawSQL string, args ...any) Clause {
+	return orderByArgsClause{
+		rawSQL: rawSQL,
+		args:   args,
 	}
 }
 
@@ -228,8 +260,8 @@ type limitClause struct {
 	limit int64
 }
 
-func (c limitClause) Apply(b *Builder) {
-	b.Limit(c.limit)
+func (c limitClause) Apply(b Builder) Builder {
+	return b.Limit(c.limit)
 }
 
 func Limit(limit int64) Clause {
@@ -242,8 +274,8 @@ type offsetClause struct {
 	offset int64
 }
 
-func (c offsetClause) Apply(b *Builder) {
-	b.Offset(c.offset)
+func (c offsetClause) Apply(b Builder) Builder {
+	return b.Offset(c.offset)
 }
 
 func Offset(offset int64) Clause {
@@ -257,8 +289,8 @@ type limitOffsetClause struct {
 	offset int64
 }
 
-func (c limitOffsetClause) Apply(b *Builder) {
-	b.LimitOffset(c.limit, c.offset)
+func (c limitOffsetClause) Apply(b Builder) Builder {
+	return b.LimitOffset(c.limit, c.offset)
 }
 
 func LimitOffset(limit, offset int64) Clause {
@@ -273,8 +305,8 @@ type suffixClause struct {
 	args   []any
 }
 
-func (c suffixClause) Apply(b *Builder) {
-	b.Suffix(c.rawSQL, c.args...)
+func (c suffixClause) Apply(b Builder) Builder {
+	return b.Suffix(c.rawSQL, c.args...)
 }
 
 func Suffix(rawSQL string, args ...any) Clause {

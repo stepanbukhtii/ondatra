@@ -5,24 +5,6 @@ import (
 	"strings"
 )
 
-type AllColumns []string
-
-func (c AllColumns) Table(prefix string) []string {
-	var columns []string
-	for _, column := range c {
-		columns = append(columns, fmt.Sprintf("%s.%s", prefix, column))
-	}
-	return columns
-}
-
-func (c AllColumns) TableAlias(prefix, alias string) []string {
-	var columns []string
-	for _, column := range c {
-		columns = append(columns, fmt.Sprintf("%s.%s AS \"%s.%s\"", prefix, column, alias, column))
-	}
-	return columns
-}
-
 type Column[T comparable] struct {
 	Name    string
 	Set     Value[T]
