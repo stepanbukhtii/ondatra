@@ -161,7 +161,7 @@ func TestBuilder_Select(t *testing.T) {
 			expectQuery: "SELECT a, b FROM (SELECT c FROM d WHERE i = ?) AS subq",
 			expectArgs:  []any{0},
 		}, {
-			name: "select from select",
+			name: "select from select 2",
 			builder: NewEmptyBuilder().Select("c").
 				FromSelect(
 					NewEmptyBuilder().

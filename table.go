@@ -26,10 +26,10 @@ func (t Table) Columns() []string {
 	return columns
 }
 
-func (t Table) ColumnsAlias(prefix, alias string) []string {
+func (t Table) ColumnsAlias(alias string) []string {
 	var columns []string
 	for _, column := range t.columns {
-		columns = append(columns, fmt.Sprintf("%s.%s AS \"%s.%s\"", prefix, column, alias, column))
+		columns = append(columns, fmt.Sprintf("\"%s\".%s AS \"%s.%s\"", alias, column, alias, column))
 	}
 	return columns
 }

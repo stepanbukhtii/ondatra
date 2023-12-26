@@ -20,6 +20,46 @@ func Prefix(rawSQL string, args ...any) Clause {
 	}
 }
 
+type insertClause struct{}
+
+func (c insertClause) Apply(b Builder) Builder {
+	return b.Insert()
+}
+
+func Insert() Clause {
+	return insertClause{}
+}
+
+type selectClause struct{}
+
+func (c selectClause) Apply(b Builder) Builder {
+	return b.Select()
+}
+
+func Select() Clause {
+	return selectClause{}
+}
+
+type updateClause struct{}
+
+func (c updateClause) Apply(b Builder) Builder {
+	return b.Update()
+}
+
+func Update() Clause {
+	return updateClause{}
+}
+
+type deleteClause struct{}
+
+func (c deleteClause) Apply(b Builder) Builder {
+	return b.Delete()
+}
+
+func Delete() Clause {
+	return deleteClause{}
+}
+
 type selectColumnsClause struct {
 	columns []string
 }
@@ -118,21 +158,33 @@ func SetExpr(expr ...Expr) Clause {
 	}
 }
 
-type joinClause struct {
-	joinType string
-	join     string
-	args     []any
+type fromClause struct {
+	from string
 }
 
-func (c joinClause) Apply(b Builder) Builder {
-	return b.Join(c.joinType, c.join)
+func (c fromClause) Apply(b Builder) Builder {
+	return b.From(c.from)
 }
 
-func Join(joinType, join string, args ...any) Clause {
-	return joinClause{
-		joinType: joinType,
-		join:     join,
-		args:     args,
+func From(table string) Clause {
+	return fromClause{
+		from: table,
+	}
+}
+
+type fromSelectClause struct {
+	from  Expr
+	alias string
+}
+
+func (c fromSelectClause) Apply(b Builder) Builder {
+	return b.FromSelect(c.from, c.alias)
+}
+
+func FromSelect(from Expr, alias string) Clause {
+	return fromSelectClause{
+		from:  from,
+		alias: alias,
 	}
 }
 
@@ -152,17 +204,35 @@ func JoinRaw(rawSQL string, args ...any) Clause {
 	}
 }
 
-type joinExprClause struct {
-	expr []Expr
+type joinClause struct {
+	joinType string
+	join     string
+	args     []any
 }
 
-func (c joinExprClause) Apply(b Builder) Builder {
-	return b.JoinExpr(c.expr...)
+func (c joinClause) Apply(b Builder) Builder {
+	return b.Join(c.joinType, c.join)
 }
 
-func JoinExpr(expr ...Expr) Clause {
-	return joinExprClause{
-		expr: expr,
+func Join(joinType, join string, args ...any) Clause {
+	return joinClause{
+		joinType: joinType,
+		join:     join,
+		args:     args,
+	}
+}
+
+type joinBuilderClause struct {
+	joinExpr []JoinExpr
+}
+
+func (c joinBuilderClause) Apply(b Builder) Builder {
+	return b.JoinExpr(c.joinExpr...)
+}
+
+func JoinBuilder(joinExpr ...JoinExpr) Clause {
+	return joinBuilderClause{
+		joinExpr: joinExpr,
 	}
 }
 

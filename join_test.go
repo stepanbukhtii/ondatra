@@ -37,7 +37,7 @@ func TestJoinBuilder(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		b = b.NewJoin(JoinLeft, test.table, test.alias, test.field, test.relatedField)
+		b = b.NewJoin(JoinLeft, NewTable(test.table, []string{"id", "first_name"}), test.alias, test.field, test.relatedField)
 		query, _, err := b.ToSQL()
 		assert.NoError(t, err)
 		assert.Equal(t, test.expectQuery, query)

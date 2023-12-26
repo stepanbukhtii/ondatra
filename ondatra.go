@@ -322,7 +322,7 @@ func (b Builder) From(table string) Builder {
 	return b
 }
 
-func (b Builder) FromSelect(from Builder, alias string) Builder {
+func (b Builder) FromSelect(from Expr, alias string) Builder {
 	b.table = NewExpr("(?) AS "+alias, from)
 	return b
 }
@@ -336,10 +336,11 @@ func (b Builder) Join(joinType, join string, args ...any) Builder {
 	return b.JoinRaw(fmt.Sprintf("%s JOIN %s", joinType, join), args...)
 }
 
-func (b Builder) JoinExpr(expr ...Expr) Builder {
+func (b Builder) JoinExpr(expr ...JoinExpr) Builder {
 	for i := range expr {
 		if expr[i] != nil {
 			b.joins = append(b.joins, expr[i])
+			b.SelectColumns(expr[i].SelectColumns()...)
 		}
 	}
 	return b
