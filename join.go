@@ -6,6 +6,7 @@ type JoinExpr interface {
 	Expr
 	SelectColumns() []string
 	NewJoin(joinType string, table Table, alias, field, relatedField string) JoinExpr
+	RelatedTable(relatedTable string) JoinExpr
 }
 
 func NewJoinBuilder(table string) JoinExpr {
@@ -28,33 +29,53 @@ func (b tableJoinBuilder) SelectColumns() []string {
 
 func (b tableJoinBuilder) NewJoin(joinType string, table Table, alias, field, relatedField string) JoinExpr {
 	return &aliasJoinBuilder{
-		Expr: NewExpr(fmt.Sprintf(
-			"%s JOIN %s as \"%s\" ON \"%s\".%s = \"%s\".%s",
-			joinType, table.Name(), alias, alias, field, b.table, relatedField,
-		)),
-		alias:         alias,
-		selectColumns: table.ColumnsAlias(alias),
+		joinType:     joinType,
+		table:        table,
+		alias:        alias,
+		field:        field,
+		relatedTable: b.table,
+		relatedField: relatedField,
 	}
 }
 
+func (b tableJoinBuilder) RelatedTable(_ string) JoinExpr {
+	return b
+}
+
 type aliasJoinBuilder struct {
-	Expr
-	alias         string
-	selectColumns []string
+	joinType     string
+	table        Table
+	alias        string
+	field        string
+	relatedTable string
+	relatedField string
+}
+
+func (b aliasJoinBuilder) ToSQL() (string, []any, error) {
+	return NewExpr(fmt.Sprintf(
+		"%s JOIN %s as \"%s\" ON \"%s\".%s = \"%s\".\"%s\"",
+		b.joinType, b.table.Name(), b.alias, b.alias, b.field, b.relatedTable, b.relatedField,
+	)).ToSQL()
 }
 
 func (b aliasJoinBuilder) SelectColumns() []string {
-	return b.selectColumns
+	return b.table.ColumnsAlias(b.alias)
 }
 
 func (b aliasJoinBuilder) NewJoin(joinType string, table Table, alias, field, relatedField string) JoinExpr {
 	alias = fmt.Sprintf("%s.%s", b.alias, alias)
 	return &aliasJoinBuilder{
-		Expr: NewExpr(fmt.Sprintf(
-			"%s JOIN %s as \"%s\" ON \"%s\".%s = \"%s\".%s",
-			joinType, table.Name(), alias, alias, field, b.alias, relatedField,
-		)),
-		alias:         alias,
-		selectColumns: table.ColumnsAlias(alias),
+		joinType:     joinType,
+		table:        table,
+		alias:        alias,
+		field:        field,
+		relatedTable: b.alias,
+		relatedField: relatedField,
 	}
+}
+
+func (b aliasJoinBuilder) RelatedTable(relatedTable string) JoinExpr {
+	b.relatedField = fmt.Sprintf("%s.%s", b.relatedTable, b.relatedField)
+	b.relatedTable = relatedTable
+	return b
 }
