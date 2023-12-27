@@ -340,7 +340,10 @@ func (b Builder) JoinExpr(expr ...JoinExpr) Builder {
 	for i := range expr {
 		if expr[i] != nil {
 			b.joins = append(b.joins, expr[i])
-			b.SelectColumns(expr[i].SelectColumns()...)
+			columns := expr[i].SelectColumns()
+			for _, column := range columns {
+				b.selectColumns = append(b.selectColumns, NewExpr(column))
+			}
 		}
 	}
 	return b
