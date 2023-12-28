@@ -30,14 +30,18 @@ func Insert() Clause {
 	return insertClause{}
 }
 
-type selectClause struct{}
-
-func (c selectClause) Apply(b Builder) Builder {
-	return b.Select()
+type selectClause struct {
+	columns []string
 }
 
-func Select() Clause {
-	return selectClause{}
+func (c selectClause) Apply(b Builder) Builder {
+	return b.Select(c.columns...)
+}
+
+func Select(columns ...string) Clause {
+	return selectClause{
+		columns: columns,
+	}
 }
 
 type updateClause struct{}

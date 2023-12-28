@@ -6,6 +6,7 @@ type JoinExpr interface {
 	Expr
 	SelectColumns() []string
 	NewJoin(joinType string, table Table, alias, field, relatedField string) JoinExpr
+	Alias() string
 	RelatedTable(relatedTable string) JoinExpr
 }
 
@@ -36,6 +37,10 @@ func (b tableJoinBuilder) NewJoin(joinType string, table Table, alias, field, re
 		relatedTable: b.table,
 		relatedField: relatedField,
 	}
+}
+
+func (b tableJoinBuilder) Alias() string {
+	return ""
 }
 
 func (b tableJoinBuilder) RelatedTable(_ string) JoinExpr {
@@ -72,6 +77,10 @@ func (b aliasJoinBuilder) NewJoin(joinType string, table Table, alias, field, re
 		relatedTable: b.alias,
 		relatedField: relatedField,
 	}
+}
+
+func (b aliasJoinBuilder) Alias() string {
+	return b.alias
 }
 
 func (b aliasJoinBuilder) RelatedTable(relatedTable string) JoinExpr {
