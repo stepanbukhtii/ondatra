@@ -51,8 +51,32 @@ func (c Column[T]) IsNull() Expr {
 	return NewExpr(fmt.Sprintf("%s IS NULL", c.Name))
 }
 
+func (c Column[T]) IsNullValue(value bool) Expr {
+	if value {
+		return c.IsNull()
+	}
+	return nil
+}
+
 func (c Column[T]) IsNotNull() Expr {
 	return NewExpr(fmt.Sprintf("%s IS NOT NULL", c.Name))
+}
+
+func (c Column[T]) IsNotNullValue(value bool) Expr {
+	if value {
+		return c.IsNotNull()
+	}
+	return nil
+}
+
+func (c Column[T]) IsNullPtr(value *bool) Expr {
+	if value == nil {
+		return nil
+	}
+	if *value {
+		return c.IsNull()
+	}
+	return c.IsNotNull()
 }
 
 type Value[T comparable] string

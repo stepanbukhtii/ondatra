@@ -19,9 +19,13 @@ func (t Table) Name() string {
 }
 
 func (t Table) Columns() []string {
+	return t.columns
+}
+
+func (t Table) ColumnsTable() []string {
 	var columns []string
 	for _, column := range t.columns {
-		columns = append(columns, fmt.Sprintf("%s.%s", t.name, column))
+		columns = append(columns, fmt.Sprintf("\"%s\".%s", t.name, column))
 	}
 	return columns
 }

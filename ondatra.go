@@ -227,7 +227,7 @@ func (b Builder) SetExpr(expr ...Expr) Builder {
 // StructColumns set columns for update or insert from struct with db tags
 func (b Builder) StructColumns(object any, columns ...string) Builder {
 	if b.command == CommandInsert && len(b.insertValues) == 0 {
-		b.insertValues = append(b.insertValues, []any{})
+		b.insertValues = make([][]any, 1)
 	}
 
 	v := reflect.Indirect(reflect.ValueOf(object))
@@ -240,16 +240,21 @@ func (b Builder) StructColumns(object any, columns ...string) Builder {
 		}
 		columnName := dbTags[0]
 
+		if len(columns) != 0 {
+			var found bool
+			for i := range columns {
+				if columns[i] == columnName {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+		}
+
 		field := v.Field(i)
 		value := field.Interface()
-
-		if columnName == ColumnCreatedAt || columnName == ColumnUpdatedAt {
-			if b.command == CommandInsert {
-				b.returningColumns = append(b.returningColumns, columnName)
-				b.returningDest = append(b.returningDest, field.Addr().Interface())
-			}
-			continue
-		}
 
 		dbTags = dbTags[1:]
 
@@ -263,37 +268,29 @@ func (b Builder) StructColumns(object any, columns ...string) Builder {
 			}
 		}
 
-		if primaryKey && b.command == CommandUpdate {
-			primaryKeys[columnName] = value
-			continue
-		}
-
-		if len(columns) != 0 {
-			var found bool
-			for i := range columns {
-				if columns[i] == columnName {
-					found = true
-					break
-				}
-			}
-			if found {
-				continue
-			}
-		}
-
-		if omitempty && field.Interface() == reflect.Zero(field.Type()).Interface() {
-			if b.command == CommandInsert {
-				b.returningColumns = append(b.returningColumns, columnName)
-				b.returningDest = append(b.returningDest, field.Addr().Interface())
-			}
-			continue
-		}
-
 		switch b.command {
 		case CommandInsert:
+			if omitempty && field.Interface() == reflect.Zero(field.Type()).Interface() {
+				b.returningColumns = append(b.returningColumns, columnName)
+				b.returningDest = append(b.returningDest, field.Addr().Interface())
+				continue
+			}
+
 			b.insertColumns = append(b.insertColumns, columnName)
 			b.insertValues[0] = append(b.insertValues[0], value)
 		case CommandUpdate:
+			if primaryKey {
+				primaryKeys[columnName] = value
+				continue
+			}
+			if columnName == ColumnCreatedAt {
+				continue
+			}
+			if columnName == ColumnUpdatedAt {
+				b.updateValues = append(b.updateValues, NewExpr(fmt.Sprintf("%s = DEFAULT", columnName)))
+				continue
+			}
+
 			b.updateValues = append(b.updateValues, NewExpr(fmt.Sprintf("%s = ?", columnName), value))
 		}
 	}
