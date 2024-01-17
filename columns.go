@@ -33,17 +33,17 @@ func NewColumn[T comparable](name string) Column[T] {
 	}
 }
 
-func (c Column[T]) IN(value ...any) Expr {
+func (c Column[T]) IN(value ...T) Expr {
 	return NewExpr(
 		fmt.Sprintf("%s IN (%s)", c.Name, strings.TrimRight(strings.Repeat("?,", len(value)), ",")),
-		value...,
+		c.convertToArguments(value)...,
 	)
 }
 
-func (c Column[T]) NIN(value ...any) Expr {
+func (c Column[T]) NIN(value ...T) Expr {
 	return NewExpr(
 		fmt.Sprintf("%s NOT IN (%s)", c.Name, strings.TrimRight(strings.Repeat("?,", len(value)), ",")),
-		value...,
+		c.convertToArguments(value)...,
 	)
 }
 
@@ -77,6 +77,14 @@ func (c Column[T]) IsNullPtr(value *bool) Expr {
 		return c.IsNull()
 	}
 	return c.IsNotNull()
+}
+
+func (c Column[T]) convertToArguments(value []T) []any {
+	args := make([]any, len(value))
+	for i := range value {
+		args[i] = value[i]
+	}
+	return args
 }
 
 type Value[T comparable] string
