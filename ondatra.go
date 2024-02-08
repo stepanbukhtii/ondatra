@@ -3,6 +3,7 @@ package ondatra
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"github.com/jmoiron/sqlx"
@@ -270,10 +271,24 @@ func (b Builder) StructColumns(object any, columns ...string) Builder {
 
 		switch b.command {
 		case CommandInsert:
-			if omitempty && field.Interface() == reflect.Zero(field.Type()).Interface() {
-				b.returningColumns = append(b.returningColumns, columnName)
-				b.returningDest = append(b.returningDest, field.Addr().Interface())
-				continue
+			if omitempty {
+				var skip bool
+				if valuer, ok := value.(driver.Valuer); ok {
+					valuerValue, err := valuer.Value()
+					if err == nil && (valuerValue == nil || valuerValue == reflect.Zero(reflect.TypeOf(valuerValue)).Interface()) {
+						skip = true
+					}
+				} else {
+					if field.Interface() == reflect.Zero(field.Type()).Interface() {
+						skip = true
+					}
+				}
+
+				if skip {
+					b.returningColumns = append(b.returningColumns, columnName)
+					b.returningDest = append(b.returningDest, field.Addr().Interface())
+					continue
+				}
 			}
 
 			b.insertColumns = append(b.insertColumns, columnName)
