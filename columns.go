@@ -7,7 +7,7 @@ import (
 
 type Column[T comparable] struct {
 	Name    string
-	Set     Value[T]
+	Set     SetValue[T]
 	EQ      Value[T]
 	NEQ     Value[T]
 	LT      Value[T]
@@ -21,7 +21,7 @@ type Column[T comparable] struct {
 func NewColumn[T comparable](name string) Column[T] {
 	return Column[T]{
 		Name:    name,
-		Set:     Value[T](fmt.Sprintf("%s = ?", name)),
+		Set:     SetValue[T](fmt.Sprintf("%s = ?", name)),
 		EQ:      Value[T](fmt.Sprintf("%s = ?", name)),
 		NEQ:     Value[T](fmt.Sprintf("%s != ?", name)),
 		LT:      Value[T](fmt.Sprintf("%s <= ?", name)),
@@ -98,6 +98,20 @@ func (v Value[T]) Ptr(ptr *T) Expr {
 		return nil
 	}
 	return NewExpr(string(v), *ptr)
+}
+
+type SetValue[T comparable] string
+
+func (v SetValue[T]) Value(value T) Expr {
+	return NewExpr(string(v), value)
+}
+
+func (v SetValue[T]) Ptr(ptr *T) Expr {
+	return NewExpr(string(v), *ptr)
+}
+
+func (v SetValue[T]) SetNull() Expr {
+	return NewExpr(string(v), nil)
 }
 
 func OR(conditions ...Expr) Expr {

@@ -18,6 +18,10 @@ func (t Table) Name() string {
 	return t.name
 }
 
+func (t Table) AllColumns() string {
+	return fmt.Sprintf("%s.*", t.name)
+}
+
 func (t Table) Columns() []string {
 	return t.columns
 }

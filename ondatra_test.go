@@ -77,6 +77,7 @@ func TestBuilder_Update(t *testing.T) {
 				SetMap(map[string]interface{}{"c": 2}).
 				Set("c1", NewExpr("CASE status WHEN 1 THEN 2 WHEN 2 THEN 1 END")).
 				Set("c2", NewExpr("CASE WHEN a = 2 THEN ? WHEN a = 3 THEN ? END", "foo", "bar")).
+				Set("c3", nil).
 				Where("d = ?", 3).
 				OrderBy("e").
 				Limit(4).
@@ -84,9 +85,10 @@ func TestBuilder_Update(t *testing.T) {
 				Suffix("RETURNING ?", 6),
 			expectQuery: "WITH prefix AS ? UPDATE a SET b = ? + 1, c = ?, " +
 				"c1 = CASE status WHEN 1 THEN 2 WHEN 2 THEN 1 END, " +
-				"c2 = CASE WHEN a = 2 THEN ? WHEN a = 3 THEN ? END " +
+				"c2 = CASE WHEN a = 2 THEN ? WHEN a = 3 THEN ? END, " +
+				"c3 = ? " +
 				"WHERE d = ? ORDER BY e LIMIT 4 OFFSET 5 RETURNING ?",
-			expectArgs: []any{0, 1, 2, "foo", "bar", 3, 6},
+			expectArgs: []any{0, 1, 2, "foo", "bar", nil, 3, 6},
 		},
 	}
 

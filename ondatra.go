@@ -9,6 +9,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"log"
 	"reflect"
+	"slices"
 	"strings"
 )
 
@@ -41,8 +42,8 @@ type Builder struct {
 	command          string   // for all
 	options          []string // for all
 	table            Expr     // for all
-	selectColumns    []Expr   // only for select
-	insertColumns    []string // only for insert
+	selectExpr       []Expr   // only for select
+	columns          []string // only for insert or update
 	insertValues     [][]any  // only for insert
 	returningColumns []string // only for insert
 	returningDest    []any    // only for insert
@@ -170,13 +171,13 @@ func (b Builder) Command(command string) Builder {
 
 func (b Builder) SelectColumns(columns ...string) Builder {
 	for _, column := range columns {
-		b.selectColumns = append(b.selectColumns, NewExpr(column))
+		b.selectExpr = append(b.selectExpr, NewExpr(column))
 	}
 	return b
 }
 
 func (b Builder) SelectColumn(rawSQL string, args ...any) Builder {
-	b.selectColumns = append(b.selectColumns, NewExpr(rawSQL, args...))
+	b.selectExpr = append(b.selectExpr, NewExpr(rawSQL, args...))
 	return b
 }
 
@@ -192,7 +193,7 @@ func (b Builder) Distinct() Builder {
 
 // Columns use for insert columns
 func (b Builder) Columns(columns ...string) Builder {
-	b.insertColumns = append(b.insertColumns, columns...)
+	b.columns = append(b.columns, columns...)
 	return b
 }
 
@@ -216,6 +217,7 @@ func (b Builder) SetMap(clauses map[string]any) Builder {
 	return b
 }
 
+// SetExpr use for update
 func (b Builder) SetExpr(expr ...Expr) Builder {
 	for i := range expr {
 		if expr[i] != nil {
@@ -225,98 +227,16 @@ func (b Builder) SetExpr(expr ...Expr) Builder {
 	return b
 }
 
-// StructColumns set columns for update or insert from struct with db tags
-func (b Builder) StructColumns(object any, columns ...string) Builder {
-	if b.command == CommandInsert && len(b.insertValues) == 0 {
-		b.insertValues = make([][]any, 1)
+// StructColumns set columns for insert or update from struct with db tags
+func (b Builder) StructColumns(object any) Builder {
+	switch b.command {
+	case CommandInsert:
+		return b.insertStructColumns(object)
+	case CommandUpdate:
+		return b.updateStructColumns(object)
+	default:
+		return b
 	}
-
-	v := reflect.Indirect(reflect.ValueOf(object))
-
-	primaryKeys := make(map[string]any)
-	for i := 0; i < v.NumField(); i++ {
-		dbTags := strings.Split(v.Type().Field(i).Tag.Get("db"), ",")
-		if len(dbTags) == 0 {
-			continue
-		}
-		columnName := dbTags[0]
-
-		if len(columns) != 0 {
-			var found bool
-			for i := range columns {
-				if columns[i] == columnName {
-					found = true
-					break
-				}
-			}
-			if !found {
-				continue
-			}
-		}
-
-		field := v.Field(i)
-		value := field.Interface()
-
-		dbTags = dbTags[1:]
-
-		var omitempty, primaryKey bool
-		for j := range dbTags {
-			switch dbTags[j] {
-			case modelTagOmitempty:
-				omitempty = true
-			case modelTagPrimaryKey:
-				primaryKey = true
-			}
-		}
-
-		switch b.command {
-		case CommandInsert:
-			if omitempty {
-				var skip bool
-				if valuer, ok := value.(driver.Valuer); ok {
-					valuerValue, err := valuer.Value()
-					if err == nil && (valuerValue == nil || valuerValue == reflect.Zero(reflect.TypeOf(valuerValue)).Interface()) {
-						skip = true
-					}
-				} else {
-					if field.Interface() == reflect.Zero(field.Type()).Interface() {
-						skip = true
-					}
-				}
-
-				if skip {
-					b.returningColumns = append(b.returningColumns, columnName)
-					b.returningDest = append(b.returningDest, field.Addr().Interface())
-					continue
-				}
-			}
-
-			b.insertColumns = append(b.insertColumns, columnName)
-			b.insertValues[0] = append(b.insertValues[0], value)
-		case CommandUpdate:
-			if primaryKey {
-				primaryKeys[columnName] = value
-				continue
-			}
-			if columnName == ColumnCreatedAt {
-				continue
-			}
-			if columnName == ColumnUpdatedAt {
-				b.updateValues = append(b.updateValues, NewExpr(fmt.Sprintf("%s = DEFAULT", columnName)))
-				continue
-			}
-
-			b.updateValues = append(b.updateValues, NewExpr(fmt.Sprintf("%s = ?", columnName), value))
-		}
-	}
-
-	if b.command == CommandUpdate {
-		for columnName, value := range primaryKeys {
-			b.whereExpr = append(b.whereExpr, NewExpr(fmt.Sprintf("%s = ?", columnName), value))
-		}
-	}
-
-	return b
 }
 
 func (b Builder) Table(table string) Builder {
@@ -354,7 +274,7 @@ func (b Builder) JoinExpr(expr ...JoinExpr) Builder {
 			b.joins = append(b.joins, expr[i])
 			columns := expr[i].SelectColumns()
 			for _, column := range columns {
-				b.selectColumns = append(b.selectColumns, NewExpr(column))
+				b.selectExpr = append(b.selectExpr, NewExpr(column))
 			}
 		}
 	}
@@ -447,11 +367,11 @@ func (b Builder) ToSQL() (string, []any, error) {
 
 	switch b.command {
 	case CommandSelect:
-		if len(b.selectColumns) == 0 {
+		if len(b.selectExpr) == 0 {
 			return "", nil, NotSetColumns
 		}
 
-		if args, err = writeExprs(b.selectColumns, &buffer, ", ", args); err != nil {
+		if args, err = writeExprs(b.selectExpr, &buffer, ", ", args); err != nil {
 			return "", nil, err
 		}
 		buffer.WriteString(" ")
@@ -476,8 +396,8 @@ func (b Builder) ToSQL() (string, []any, error) {
 			buffer.WriteString(" ")
 		}
 
-		if len(b.insertColumns) > 0 {
-			buffer.WriteString(fmt.Sprintf("(%s) ", strings.Join(b.insertColumns, ", ")))
+		if len(b.columns) > 0 {
+			buffer.WriteString(fmt.Sprintf("(%s) ", strings.Join(b.columns, ", ")))
 		}
 
 		buffer.WriteString("VALUES ")
@@ -725,6 +645,90 @@ func (b Builder) InsertReturningContext(ctx context.Context) error {
 
 func (b Builder) Raw(ctx context.Context, dest any, query string, args ...any) error {
 	return b.conn().SelectContext(ctx, dest, query, args)
+}
+
+func (b Builder) insertStructColumns(object any) Builder {
+	if len(b.insertValues) == 0 {
+		b.insertValues = make([][]any, 1)
+	}
+
+	v := reflect.Indirect(reflect.ValueOf(object))
+
+	for i := 0; i < v.NumField(); i++ {
+		dbTags := strings.Split(v.Type().Field(i).Tag.Get("db"), ",")
+		if len(dbTags) == 0 {
+			continue
+		}
+		columnName := dbTags[0]
+
+		field := v.Field(i)
+		value := field.Interface()
+
+		if slices.Contains(dbTags, modelTagOmitempty) {
+			var skip bool
+			if valuer, ok := value.(driver.Valuer); ok {
+				valuerValue, err := valuer.Value()
+				if err == nil && (valuerValue == nil || valuerValue == reflect.Zero(reflect.TypeOf(valuerValue)).Interface()) {
+					skip = true
+				}
+			} else {
+				if field.Interface() == reflect.Zero(field.Type()).Interface() {
+					skip = true
+				}
+			}
+
+			if skip {
+				b.returningColumns = append(b.returningColumns, columnName)
+				b.returningDest = append(b.returningDest, field.Addr().Interface())
+				continue
+			}
+		}
+
+		b.columns = append(b.columns, columnName)
+		b.insertValues[0] = append(b.insertValues[0], value)
+	}
+
+	return b
+}
+
+func (b Builder) updateStructColumns(object any) Builder {
+	v := reflect.Indirect(reflect.ValueOf(object))
+
+	primaryKeys := make(map[string]any)
+	for i := 0; i < v.NumField(); i++ {
+		dbTags := strings.Split(v.Type().Field(i).Tag.Get("db"), ",")
+		if len(dbTags) == 0 {
+			continue
+		}
+		columnName := dbTags[0]
+
+		if len(b.columns) > 0 && !slices.Contains(b.columns, columnName) {
+			continue
+		}
+
+		field := v.Field(i)
+		value := field.Interface()
+
+		if columnName == ColumnCreatedAt {
+			continue
+		}
+		if columnName == ColumnUpdatedAt {
+			b.updateValues = append(b.updateValues, NewExpr(fmt.Sprintf("%s = DEFAULT", columnName)))
+			continue
+		}
+		if slices.Contains(dbTags, modelTagPrimaryKey) {
+			primaryKeys[columnName] = value
+			continue
+		}
+
+		b.updateValues = append(b.updateValues, NewExpr(fmt.Sprintf("%s = ?", columnName), value))
+	}
+
+	for columnName, value := range primaryKeys {
+		b.whereExpr = append(b.whereExpr, NewExpr(fmt.Sprintf("%s = ?", columnName), value))
+	}
+
+	return b
 }
 
 func (b Builder) conn() Connection {
