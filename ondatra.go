@@ -27,7 +27,8 @@ const (
 	ColumnCreatedAt = "created_at"
 	ColumnUpdatedAt = "updated_at"
 
-	modelTagOmitempty  = "omitempty"
+	modelTagColumn     = "column"
+	modelTagDefault    = "default"
 	modelTagPrimaryKey = "pk"
 )
 
@@ -656,7 +657,7 @@ func (b Builder) insertStructColumns(object any) Builder {
 
 	for i := 0; i < v.NumField(); i++ {
 		dbTags := strings.Split(v.Type().Field(i).Tag.Get("db"), ",")
-		if len(dbTags) == 0 {
+		if len(dbTags) == 0 || !slices.Contains(dbTags, modelTagColumn) {
 			continue
 		}
 		columnName := dbTags[0]
@@ -664,7 +665,7 @@ func (b Builder) insertStructColumns(object any) Builder {
 		field := v.Field(i)
 		value := field.Interface()
 
-		if slices.Contains(dbTags, modelTagOmitempty) {
+		if slices.Contains(dbTags, modelTagDefault) {
 			var skip bool
 			if valuer, ok := value.(driver.Valuer); ok {
 				valuerValue, err := valuer.Value()
@@ -672,7 +673,7 @@ func (b Builder) insertStructColumns(object any) Builder {
 					skip = true
 				}
 			} else {
-				if field.Interface() == reflect.Zero(field.Type()).Interface() {
+				if value == reflect.Zero(field.Type()).Interface() {
 					skip = true
 				}
 			}
@@ -695,9 +696,10 @@ func (b Builder) updateStructColumns(object any) Builder {
 	v := reflect.Indirect(reflect.ValueOf(object))
 
 	primaryKeys := make(map[string]any)
+
 	for i := 0; i < v.NumField(); i++ {
 		dbTags := strings.Split(v.Type().Field(i).Tag.Get("db"), ",")
-		if len(dbTags) == 0 {
+		if len(dbTags) == 0 || !slices.Contains(dbTags, modelTagColumn) {
 			continue
 		}
 		columnName := dbTags[0]
