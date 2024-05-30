@@ -6,49 +6,52 @@ import (
 )
 
 type Column[T comparable] struct {
-	Name    string
-	Set     SetValue[T]
-	EQ      Value[T]
-	NEQ     Value[T]
-	LT      Value[T]
-	LTE     Value[T]
-	GT      Value[T]
-	GTE     Value[T]
-	Like    Value[T]
-	NotLike Value[T]
+	Name          string
+	QualifiedName string
+	Set           SetValue[T]
+	EQ            Value[T]
+	NEQ           Value[T]
+	LT            Value[T]
+	LTE           Value[T]
+	GT            Value[T]
+	GTE           Value[T]
+	Like          Value[T]
+	NotLike       Value[T]
 }
 
-func NewColumn[T comparable](name string) Column[T] {
+func NewColumn[T comparable](table, column string) Column[T] {
+	qualifiedName := fmt.Sprintf("\"%s\".%s", table, column)
 	return Column[T]{
-		Name:    name,
-		Set:     SetValue[T](fmt.Sprintf("%s = ?", name)),
-		EQ:      Value[T](fmt.Sprintf("%s = ?", name)),
-		NEQ:     Value[T](fmt.Sprintf("%s != ?", name)),
-		LT:      Value[T](fmt.Sprintf("%s <= ?", name)),
-		LTE:     Value[T](fmt.Sprintf("%s < ?", name)),
-		GT:      Value[T](fmt.Sprintf("%s > ?", name)),
-		GTE:     Value[T](fmt.Sprintf("%s >= ?", name)),
-		Like:    Value[T](fmt.Sprintf("%s LIKE ?", name)),
-		NotLike: Value[T](fmt.Sprintf("%s NOT LIKE ?", name)),
+		Name:          column,
+		QualifiedName: qualifiedName,
+		Set:           SetValue[T](fmt.Sprintf("%s = ?", column)),
+		EQ:            Value[T](fmt.Sprintf("%s = ?", qualifiedName)),
+		NEQ:           Value[T](fmt.Sprintf("%s != ?", qualifiedName)),
+		LT:            Value[T](fmt.Sprintf("%s <= ?", qualifiedName)),
+		LTE:           Value[T](fmt.Sprintf("%s < ?", qualifiedName)),
+		GT:            Value[T](fmt.Sprintf("%s > ?", qualifiedName)),
+		GTE:           Value[T](fmt.Sprintf("%s >= ?", qualifiedName)),
+		Like:          Value[T](fmt.Sprintf("%s LIKE ?", qualifiedName)),
+		NotLike:       Value[T](fmt.Sprintf("%s NOT LIKE ?", qualifiedName)),
 	}
 }
 
 func (c Column[T]) IN(value ...T) Expr {
 	return NewExpr(
-		fmt.Sprintf("%s IN (%s)", c.Name, strings.TrimRight(strings.Repeat("?,", len(value)), ",")),
+		fmt.Sprintf("%s IN (%s)", c.QualifiedName, strings.TrimRight(strings.Repeat("?,", len(value)), ",")),
 		c.convertToArguments(value)...,
 	)
 }
 
 func (c Column[T]) NIN(value ...T) Expr {
 	return NewExpr(
-		fmt.Sprintf("%s NOT IN (%s)", c.Name, strings.TrimRight(strings.Repeat("?,", len(value)), ",")),
+		fmt.Sprintf("%s NOT IN (%s)", c.QualifiedName, strings.TrimRight(strings.Repeat("?,", len(value)), ",")),
 		c.convertToArguments(value)...,
 	)
 }
 
 func (c Column[T]) IsNull() Expr {
-	return NewExpr(fmt.Sprintf("%s IS NULL", c.Name))
+	return NewExpr(fmt.Sprintf("%s IS NULL", c.QualifiedName))
 }
 
 func (c Column[T]) IsNullValue(value bool) Expr {
@@ -59,7 +62,7 @@ func (c Column[T]) IsNullValue(value bool) Expr {
 }
 
 func (c Column[T]) IsNotNull() Expr {
-	return NewExpr(fmt.Sprintf("%s IS NOT NULL", c.Name))
+	return NewExpr(fmt.Sprintf("%s IS NOT NULL", c.QualifiedName))
 }
 
 func (c Column[T]) IsNotNullValue(value bool) Expr {
