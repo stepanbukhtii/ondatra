@@ -113,7 +113,7 @@ func (v SetValue[T]) Ptr(ptr *T) Expr {
 	return NewExpr(string(v), *ptr)
 }
 
-func (v SetValue[T]) SetNull() Expr {
+func (v SetValue[T]) Null() Expr {
 	return NewExpr(string(v), nil)
 }
 

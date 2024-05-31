@@ -46,8 +46,8 @@ type Builder struct {
 	selectExpr       []Expr   // only for select
 	columns          []string // only for insert or update
 	insertValues     [][]any  // only for insert
-	returningColumns []string // only for insert
-	returningDest    []any    // only for insert
+	returningColumns []string // only for insert or update
+	returningDest    []any    // only for insert or update
 	updateValues     []Expr   // only for update
 	joins            []Expr   // only for select
 	whereExpr        []Expr   // for all
@@ -443,6 +443,10 @@ func (b Builder) ToSQL() (string, []any, error) {
 			return "", nil, err
 		}
 		buffer.WriteString(" ")
+
+		if len(b.returningColumns) > 0 {
+			buffer.WriteString(fmt.Sprintf(" RETURNING %s", strings.Join(b.returningColumns, ", ")))
+		}
 	case CommandDelete:
 		if b.table != nil {
 			buffer.WriteString("FROM ")
@@ -612,7 +616,7 @@ func (b Builder) QueryRowContext(ctx context.Context) (*sql.Row, error) {
 	return b.conn().QueryRowContext(ctx, query, args...), nil
 }
 
-func (b Builder) InsertReturning() error {
+func (b Builder) ExecReturning() error {
 	if len(b.returningColumns) == 0 {
 		if _, err := b.Exec(); err != nil {
 			return err
@@ -628,7 +632,7 @@ func (b Builder) InsertReturning() error {
 	return b.conn().QueryRow(query, args...).Scan(b.returningDest...)
 }
 
-func (b Builder) InsertReturningContext(ctx context.Context) error {
+func (b Builder) ExecReturningContext(ctx context.Context) error {
 	if len(b.returningColumns) == 0 {
 		if _, err := b.ExecContext(ctx); err != nil {
 			return err
@@ -704,23 +708,31 @@ func (b Builder) updateStructColumns(object any) Builder {
 		}
 		columnName := dbTags[0]
 
-		if len(b.columns) > 0 && !slices.Contains(b.columns, columnName) {
+		field := v.Field(i)
+		value := field.Interface()
+
+		if slices.Contains(dbTags, modelTagPrimaryKey) {
+			primaryKeys[columnName] = value
 			continue
 		}
 
-		field := v.Field(i)
-		value := field.Interface()
+		if len(b.columns) > 0 && !slices.Contains(b.columns, columnName) {
+			continue
+		}
 
 		if columnName == ColumnCreatedAt {
 			continue
 		}
 		if columnName == ColumnUpdatedAt {
 			b.updateValues = append(b.updateValues, NewExpr(fmt.Sprintf("%s = DEFAULT", columnName)))
+			b.returningColumns = append(b.returningColumns, columnName)
+			b.returningDest = append(b.returningDest, field.Addr().Interface())
 			continue
 		}
-		if slices.Contains(dbTags, modelTagPrimaryKey) {
-			primaryKeys[columnName] = value
-			continue
+
+		if valueString, ok := value.(string); ok && strings.EqualFold(valueString, "DEFAULT") {
+			b.returningColumns = append(b.returningColumns, columnName)
+			b.returningDest = append(b.returningDest, field.Addr().Interface())
 		}
 
 		b.updateValues = append(b.updateValues, NewExpr(fmt.Sprintf("%s = ?", columnName), value))
